@@ -112,6 +112,8 @@ class PassGenerator
 
         $this->passFilename = $passId . '.pkpass';
 
+        $this->localizations = [];
+
         if (Storage::disk('passgenerator')->has($this->passFilename)) {
             if ($replaceExistent) {
                 Storage::disk('passgenerator')->delete($this->passFilename);
@@ -173,17 +175,15 @@ class PassGenerator
      */
     public function addLocalizedAssets($assetPath, $localization)
     {
-        throw new RuntimeException('Not implemented yet');
+        if (!is_file($assetPath)) {
+            throw new InvalidArgumentException("The file $assetPath does NOT exist");
+        }
 
-//        if (!is_file($assetPath)) {
-//            throw new InvalidArgumentException("The file $assetPath does NOT exist");
-//        }
-//
-//        $this->localizedAssets[$localization][basename($assetPath)] = $assetPath;
-//
-//        if (!in_array($localization, $this->localizations)) {
-//            $this->localizations[] = $localization;
-//        }
+        $this->localizedAssets[$localization][basename($assetPath)] = $assetPath;
+
+        if (!in_array($localization, $this->localizations)) {
+            $this->localizations[] = $localization;
+        }
     }
 
     /**
@@ -308,12 +308,11 @@ class PassGenerator
             $hashes[$filename] = sha1(file_get_contents($path));
         }
 
-//      // TODO: Add support for localization
-//         foreach($this->localizations as $localization) {
-//             foreach($this->localizedAssets[$localization] as $filename => $path) {
-//                 $hashes[$filename] = sha1(file_get_contents($path));
-//             }
-//         }
+         foreach($this->localizations as $localization) {
+             foreach($this->localizedAssets[$localization] as $filename => $path) {
+                 $hashes[$localization . '.lproj/' . $filename] = sha1(file_get_contents($path));
+             }
+         }
 
         return json_encode((object) $hashes);
     }
@@ -429,6 +428,12 @@ class PassGenerator
         // Add all the assets
         foreach ($this->assets as $name => $path) {
             $zip->addFile($path, $name);
+        }
+
+        foreach($this->localizations as $localization) {
+            foreach($this->localizedAssets[$localization] as $filename => $path) {
+                $zip->addFile($path, $localization . '.lproj/' . $filename);
+            }
         }
 
         $zip->close();
