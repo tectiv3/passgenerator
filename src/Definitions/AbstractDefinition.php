@@ -31,6 +31,8 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
      */
     protected $validator;
 
+    protected $locales = [];
+
     public function __construct($attributes = [])
     {
         parent::__construct($attributes);
@@ -420,6 +422,23 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
     }
 
     /**
+     * Add string to the dictionary for translation.
+     *
+     * @param string $language language project need to be added
+     * @param string $key
+     * @param string $value
+     * @return bool
+     */
+    public function addLocaleString($language, $key, $value)
+    {
+        if (!isset($this->locales[$language]) || !is_array($this->locales[$language])) {
+            $this->locales[$language] = [];
+        }
+        $this->locales[$language][$key] = $value;
+        return true;
+    }
+
+    /**
      * @param $structure
      * @return mixed
      */
@@ -443,6 +462,11 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
         $this->validate($array);
 
         return $array;
+    }
+
+    public function getLocales()
+    {
+        return $this->locales;
     }
 
     /**
@@ -476,6 +500,14 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
                 }
 
                 $structure[$key] = $value->toArray();
+                foreach ($structure[$key] as $field) {
+                    if (!isset($field['locales'])) {
+                        continue;
+                    }
+                    foreach ($field['locales'] as $language => $string) {
+                    }
+                    $this->addLocaleString($language, $field['label'], $string);
+                }
             }
 
             $data[$this->style] = $structure;
@@ -489,7 +521,11 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
         try {
             $this->validator->make($data, $this->rules())->validate();
         } catch (ValidationException $e) {
-            dd($e->validator->getMessageBag()->toArray());
+            logger()->warning($e->getMessage(), [
+                'message' => $e->validator->getMessageBag()->toArray(),
+                'data' => $data,
+            ]);
+            throw $e;
         }
     }
 

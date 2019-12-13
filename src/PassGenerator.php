@@ -46,6 +46,12 @@ class PassGenerator
     private $localizations;
 
     /**
+     * Holds array of localization details
+     * @var array
+     */
+    protected $locales = [];
+
+    /**
      * Filename for the pass. If provided, it'll be the pass_id with .pkpass
      * extension, otherwise a random name will be assigned.
      */
@@ -187,9 +193,48 @@ class PassGenerator
     }
 
     /**
+     * Add dictionary of strings for transilation.
+     *
+     * @param string $language language project need to be added
+     * @param array $strings key value pair of transilation strings
+     *     (default is equal to [])
+     * @return bool
+     */
+    public function addLocaleStrings($language, $strings = [])
+    {
+        if (!is_array($strings) || empty($strings)) {
+            throw new InvalidArgumentException('Translation strings empty or not an array');
+        }
+        if (!isset($this->locales[$language]) || !is_array($this->locales[$language])) {
+            $this->locales[$language] = [];
+        }
+
+        $this->locales[$language] = array_merge($this->locales[$language], $strings);
+
+        return true;
+    }
+
+    /**
+     * Add string to the dictionary for translation.
+     *
+     * @param string $language language project need to be added
+     * @param string $key
+     * @param string $value
+     * @return bool
+     */
+    public function addLocaleString($language, $key, $value)
+    {
+        if (!isset($this->locales[$language]) || !is_array($this->locales[$language])) {
+            $this->locales[$language] = [];
+        }
+        $this->locales[$language][$key] = $value;
+        return true;
+    }
+
+    /**
      * Set the pass definition with an array.
      *
-     * @param array $definition
+     * @param DefinitionInterface $definition
      *
      * @throws InvalidArgumentException
      *
@@ -198,14 +243,17 @@ class PassGenerator
     public function setPassDefinition($definition)
     {
         if ($definition instanceof DefinitionInterface) {
-            $definition = $definition->getPassDefinition();
+            $array = $definition->getPassDefinition();
         }
 
-        if (!is_array($definition)) {
+        if (!is_array($array)) {
             throw new InvalidArgumentException('An invalid Pass definition was provided.');
         }
 
-        $this->passJson = json_encode($definition);
+        $this->locales = ['en' => []];
+        $this->locales = array_merge($this->locales, $definition->getLocales());
+
+        $this->passJson = json_encode($array);
     }
 
     /**
@@ -313,6 +361,10 @@ class PassGenerator
                  $hashes[$localization . '.lproj/' . $filename] = sha1(file_get_contents($path));
              }
          }
+        // Creates SHA hashes for string files in each project.
+        foreach ($this->locales as $language => $strings) {
+            $hashes[$language . '.lproj/pass.strings'] = sha1($this->glueStrings($strings));
+        }
 
         return json_encode((object) $hashes);
     }
@@ -425,18 +477,46 @@ class PassGenerator
         // Add pass.json
         $zip->addFromString($this->passJsonFilename, $this->passJson);
 
+        // Add translation dictionaries
+        foreach ($this->locales as $language => $strings) {
+            if (!$zip->addEmptyDir($language . '.lproj')) {
+                throw new RuntimeException(
+                    'Could not create ' . $language . '.lproj folder in zip archive.'
+                );
+            }
+            $zip->addFromString(
+                $language . '.lproj/pass.strings',
+                $this->glueStrings($strings)
+            );
+        }
+
         // Add all the assets
         foreach ($this->assets as $name => $path) {
             $zip->addFile($path, $name);
         }
 
-        foreach($this->localizations as $localization) {
-            foreach($this->localizedAssets[$localization] as $filename => $path) {
+        foreach ($this->localizations as $localization) {
+            foreach ($this->localizedAssets[$localization] as $filename => $path) {
                 $zip->addFile($path, $localization . '.lproj/' . $filename);
             }
         }
 
         $zip->close();
+    }
+
+    /**
+     * Prepares dictionary with key value translation strings
+     *
+     * @param array $strings
+     * @return string
+     */
+    private function glueStrings($strings)
+    {
+        $dictionary = '';
+        foreach ($strings as $key => $value) {
+            $dictionary .= '"' . $key . '" = "' . addcslashes($value, '"') . '";' . PHP_EOL;
+        }
+        return $dictionary ?: '/* No, not empty at all. */';
     }
 
     /*
