@@ -500,13 +500,24 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
                 }
 
                 $structure[$key] = $value->toArray();
-                foreach ($structure[$key] as $field) {
+                foreach ($structure[$key] as &$field) {
                     if (!isset($field['locales'])) {
                         continue;
                     }
-                    foreach ($field['locales'] as $language => $string) {
+                    foreach ($field['locales'] as $language => $strings) {
+                        if (is_array($strings)) {
+                            foreach ($strings as $lkey => $lvalue) {
+                                $this->addLocaleString($language, $lkey, $lvalue);
+                            }
+                        } else {
+                            $this->addLocaleString(
+                                $language,
+                                $field['label'] ?? $field['value'],
+                                $strings
+                            );
+                        }
                     }
-                    $this->addLocaleString($language, $field['label'], $string);
+                    unset($field['locales']);
                 }
             }
 

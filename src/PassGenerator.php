@@ -193,11 +193,10 @@ class PassGenerator
     }
 
     /**
-     * Add dictionary of strings for transilation.
+     * Add dictionary of strings for translation.
      *
      * @param string $language language project need to be added
-     * @param array $strings key value pair of transilation strings
-     *     (default is equal to [])
+     * @param array $strings key value pair of translation strings
      * @return bool
      */
     public function addLocaleStrings($language, $strings = [])
@@ -252,7 +251,6 @@ class PassGenerator
 
         $this->locales = ['en' => []];
         $this->locales = array_merge($this->locales, $definition->getLocales());
-
         $this->passJson = json_encode($array);
     }
 
