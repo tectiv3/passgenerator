@@ -46,9 +46,12 @@ abstract class AbstractDefinition extends Fluent implements DefinitionInterface
         $this->attributes['teamIdentifier']     = config('passgenerator.team_identifier', '');
     }
 
-    public function setDescription($description)
+    public function setDescription($description, $locales = [])
     {
         $this->attributes['description'] = $description;
+        foreach ($locales as $language => $value) {
+            $this->addLocaleString($language, $description, $value);
+        }
 
         return $this;
     }
